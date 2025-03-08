@@ -3,3 +3,4 @@ qrcode
 numpy
 opencv-python-headless
 pillow
+paddleocr
