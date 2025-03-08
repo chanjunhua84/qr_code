@@ -184,11 +184,11 @@ def process_image(image):
         
         # Show results in a clean layout
         st.markdown("### Original Photo")
-        st.image(image, use_container_width=True)
+        st.image(image)  # Removed use_container_width
         
         st.markdown("### Detected Text Regions")
         annotated_image = draw_boxes(image, results)
-        st.image(annotated_image, use_container_width=True)
+        st.image(annotated_image)  # Removed use_container_width
         
         # Show extracted text in a clean format
         st.markdown("### 📝 Extracted Text")
@@ -211,8 +211,7 @@ def process_image(image):
                 "💾 Download Extracted Text",
                 extracted_text,
                 file_name="extracted_text.txt",
-                mime="text/plain",
-                use_container_width=True
+                mime="text/plain"
             )
     except Exception as e:
         st.error(f"Error processing image: {str(e)}")
