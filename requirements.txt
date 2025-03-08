@@ -1,5 +1,19 @@
-streamlit==1.31.1
-easyocr==1.7.1
-Pillow==10.2.0
-numpy==1.24.3
-torch==2.1.2
+# Core dependencies
+streamlit>=1.28.0
+numpy>=1.24.0
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+easyocr>=1.7.1
+
+# For camera/video streaming
+streamlit-webrtc>=0.47.0
+av>=10.0.0
+aiortc>=1.5.0
+
+# For QR code scanning
+streamlit-qrcode-scanner>=0.1.1
+pyzbar>=0.1.9
+
+# Optional but recommended for better performance
+torch>=2.0.0
+torchvision>=0.15.0
