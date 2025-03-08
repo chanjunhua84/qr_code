@@ -1,95 +1,67 @@
 import streamlit as st
 import easyocr
-import numpy as np
 from PIL import Image
+import numpy as np
 import cv2
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
-import av
 
-class VideoTransformer(VideoTransformerBase):
-    def __init__(self):
-        self.reader = easyocr.Reader(['en'])
-        self.last_text = ""
-        self.frame_count = 0
-        self.process_every_n_frames = 30
+def load_model():
+    return easyocr.Reader(['en'])
 
-    def transform(self, frame):
-        self.frame_count += 1
-        img = frame.to_ndarray(format="bgr24")
-        
-        if self.frame_count % self.process_every_n_frames == 0:
-            results = self.reader.readtext(img)
-            
-            for detection in results:
-                bbox, text, score = detection
-                if score > 0.2:
-                    points = np.array(bbox, np.int32)
-                    cv2.polylines(img, [points], True, (0, 255, 0), 2)
-                    cv2.putText(img, text, tuple(points[0]), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    self.last_text = text
-                    
-                    # Store detected text in session state
-                    if 'detected_texts' not in st.session_state:
-                        st.session_state.detected_texts = []
-                    if text not in st.session_state.detected_texts:
-                        st.session_state.detected_texts.append(text)
-        
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+def perform_ocr(image, reader):
+    results = reader.readtext(np.array(image))
+    return results
 
 def main():
-    st.title("Back Camera OCR Scanner")
+    st.title("Photo OCR Scanner")
     
-    # WebRTC configuration
-    rtc_configuration = RTCConfiguration(
-        {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-    )
+    # Initialize EasyOCR
+    @st.cache_resource
+    def get_ocr_reader():
+        return load_model()
     
-    # Specify back camera
-    camera_constraints = {
-        "video": {
-            "facingMode": {"exact": "environment"}  # This specifies back camera
-        },
-        "audio": False
-    }
+    reader = get_ocr_reader()
 
-    # Create WebRTC streamer
-    webrtc_ctx = webrtc_streamer(
-        key="camera",
-        video_transformer_factory=VideoTransformer,
-        rtc_configuration=rtc_configuration,
-        media_stream_constraints=camera_constraints,
-        async_processing=True
-    )
+    # Camera input using Streamlit's camera_input
+    img_file = st.camera_input("Take a picture", help="Uses back camera by default")
     
-    # Display detected texts
-    if 'detected_texts' in st.session_state and st.session_state.detected_texts:
-        st.subheader("Detected Text:")
-        for text in st.session_state.detected_texts:
-            st.write(text)
+    if img_file is not None:
+        # Convert image to PIL Image
+        image = Image.open(img_file)
         
-        # Add clear button
-        if st.button("Clear Detected Text"):
-            st.session_state.detected_texts = []
-            st.experimental_rerun()
-        
-        # Add download button
-        if st.download_button(
-            label="Download Text",
-            data="\n".join(st.session_state.detected_texts),
-            file_name="scanned_text.txt",
-            mime="text/plain"
-        ):
-            st.success("Text downloaded successfully!")
+        # Add a process button
+        if st.button('Extract Text'):
+            with st.spinner('Processing...'):
+                # Perform OCR
+                results = perform_ocr(image, reader)
+                
+                # Display results
+                st.subheader("Extracted Text:")
+                
+                # Store all detected text
+                all_text = []
+                
+                for result in results:
+                    text = result[1]
+                    confidence = result[2]
+                    all_text.append(text)
+                    st.write(f"Text: {text} (Confidence: {confidence:.2f})")
+                
+                # Combine all text
+                combined_text = "\n".join(all_text)
+                
+                # Download button
+                if all_text:
+                    st.download_button(
+                        label="Download extracted text",
+                        data=combined_text,
+                        file_name="extracted_text.txt",
+                        mime="text/plain"
+                    )
 
     # Mobile-friendly styling
     st.markdown("""
     <style>
     @media (max-width: 768px) {
-        .stVideo {
-            width: 100%;
-            height: auto;
-        }
         .stButton button {
             width: 100%;
             margin: 10px 0;
@@ -101,19 +73,20 @@ def main():
     # Instructions
     st.markdown("""
     ### Instructions:
-    1. Allow camera access when prompted
-    2. Use your back camera to scan text
-    3. Hold steady for better results
-    4. Detected text will appear below
-    5. Download or clear text as needed
+    1. Click 'Take a picture' to open your camera
+    2. Take a clear photo of the text
+    3. Click 'Extract Text' to process
+    4. Download the extracted text if needed
     """)
 
-    # Settings in sidebar
+    # Optional settings in sidebar
     with st.sidebar:
-        st.header("Scanner Settings")
-        confidence = st.slider("Confidence Threshold", 0.0, 1.0, 0.2)
-        scan_frequency = st.slider("Scan Frequency", 1, 60, 30, 
-                                 help="Process every N frames")
+        st.header("Settings")
+        confidence_threshold = st.slider(
+            "Confidence Threshold", 
+            0.0, 1.0, 0.2,
+            help="Adjust confidence threshold for text detection"
+        )
 
 if __name__ == "__main__":
     main()
