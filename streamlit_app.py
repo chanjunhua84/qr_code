@@ -3,34 +3,23 @@ from PIL import Image, ImageDraw
 import numpy as np
 import easyocr
 import os
+import base64
+from io import BytesIO
 
 # Force CPU usage
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Set page configuration with wide layout
+# Set page configuration
 st.set_page_config(
     page_title="Camera OCR App",
     page_icon="📸",
     layout="wide",
-    initial_sidebar_state="collapsed"  # Start with collapsed sidebar for more space
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS to improve the camera interface
+# Custom CSS and JavaScript for native camera
 st.markdown("""
     <style>
-        /* Make the camera view larger */
-        .stCamera > video {
-            width: 100%;
-            height: auto;
-            max-height: 75vh;
-        }
-        .stCamera > button {
-            width: 100%;
-            height: 3rem;
-            font-size: 1.2rem;
-            margin-top: 1rem;
-        }
-        /* Improve button visibility */
         .stButton > button {
             width: 100%;
             height: 3rem;
@@ -39,25 +28,42 @@ st.markdown("""
             background-color: #FF4B4B;
             color: white;
         }
-        /* Center the camera */
-        .stCamera {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-        /* Make text larger and more readable */
-        .big-text {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin: 1rem 0;
-        }
-        /* Add some spacing between elements */
-        .spacing {
-            margin: 2rem 0;
+        #captured-image {
+            width: 100%;
+            max-width: 800px;
+            margin: 1rem auto;
         }
     </style>
 """, unsafe_allow_html=True)
+
+# JavaScript for handling native camera
+js_code = """
+<input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+<button onclick="document.getElementById('camera-input').click();" 
+    style="width: 100%; height: 3rem; font-size: 1.2rem; margin: 1rem 0; 
+    background-color: #FF4B4B; color: white; border: none; border-radius: 0.3rem; 
+    cursor: pointer;">
+    📸 Open Camera
+</button>
+<img id="captured-image" style="display: none;">
+
+<script>
+    document.getElementById('camera-input').onchange = function(e) {
+        var file = e.target.files[0];
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('captured-image').src = e.target.result;
+            document.getElementById('captured-image').style.display = 'block';
+            // Send to Streamlit
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: e.target.result
+            }, '*');
+        };
+        reader.readAsDataURL(file);
+    };
+</script>
+"""
 
 @st.cache_resource(show_spinner=False)
 def load_ocr():
@@ -67,7 +73,7 @@ def load_ocr():
         st.error(f"Error loading OCR model: {str(e)}")
         return None
 
-def draw_boxes(image, bounds, color=(0, 255, 0), width=3):  # Increased line width
+def draw_boxes(image, bounds, color=(0, 255, 0), width=3):
     try:
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
@@ -87,6 +93,55 @@ def draw_boxes(image, bounds, color=(0, 255, 0), width=3):  # Increased line wid
         st.error(f"Error drawing boxes: {str(e)}")
         return image
 
+def process_image(image):
+    try:
+        # Convert and process image
+        image_np = np.array(image)
+        results = st.session_state.ocr_reader.readtext(image_np)
+        
+        # Show results in a clean layout
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Original Photo")
+            st.image(image, use_container_width=True)
+        
+        with col2:
+            st.markdown("### Detected Text Regions")
+            annotated_image = draw_boxes(image, results)
+            st.image(annotated_image, use_container_width=True)
+        
+        # Show extracted text in a clean format
+        st.markdown("### 📝 Extracted Text")
+        if not results:
+            st.warning("No text was detected. Please try again with a clearer photo.")
+        else:
+            extracted_text = ""
+            for result in results:
+                text, confidence = result[1], result[2]
+                extracted_text += f"{text}\n"
+                st.markdown(f"""
+                    <div style='
+                        background-color: #f0f2f6;
+                        padding: 1rem;
+                        border-radius: 0.5rem;
+                        margin: 0.5rem 0;
+                    '>
+                        <p style='font-size: 1.2rem; margin: 0;'>{text}</p>
+                        <p style='color: #666; margin: 0;'>Confidence: {confidence:.2f}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # Download button
+            st.download_button(
+                "💾 Download Extracted Text",
+                extracted_text,
+                file_name="extracted_text.txt",
+                mime="text/plain"
+            )
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
+
 def main():
     st.title("📸 Smart Text Scanner")
     
@@ -95,134 +150,38 @@ def main():
         with st.spinner("Loading OCR model..."):
             st.session_state.ocr_reader = load_ocr()
 
-    # Create two tabs with custom styling
+    # Create two tabs
     tab1, tab2 = st.tabs([
         "📸 Take Photo",
         "📁 Upload Image"
     ])
 
     with tab1:
-        st.markdown('<p class="big-text">Position text clearly in frame and take a photo</p>', 
-                   unsafe_allow_html=True)
+        st.markdown("### Take a Photo of Text")
         
-        # Full-width camera input
-        camera_image = st.camera_input("", key="camera")
+        # Insert the custom camera component
+        st.components.v1.html(js_code, height=600)
         
-        if camera_image:
+        # Get the captured image from session state
+        if 'captured_image' in st.session_state:
             try:
-                image = Image.open(camera_image)
-                
-                # Process button with custom styling
-                if st.button("📝 Extract Text from Photo", key="process_camera", 
-                           help="Click to process the captured image"):
-                    
-                    with st.spinner("Processing your image..."):
-                        # Convert and process image
-                        image_np = np.array(image)
-                        results = st.session_state.ocr_reader.readtext(image_np)
-                        
-                        # Show results in a clean layout
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown("### Original Photo")
-                            st.image(image, use_container_width=True)
-                        
-                        with col2:
-                            st.markdown("### Detected Text Regions")
-                            annotated_image = draw_boxes(image, results)
-                            st.image(annotated_image, use_container_width=True)
-                        
-                        # Show extracted text in a clean format
-                        st.markdown("### 📝 Extracted Text")
-                        if not results:
-                            st.warning("No text was detected. Please try again with a clearer photo.")
-                        else:
-                            extracted_text = ""
-                            for result in results:
-                                text, confidence = result[1], result[2]
-                                extracted_text += f"{text}\n"
-                                st.markdown(f"""
-                                    <div style='
-                                        background-color: #f0f2f6;
-                                        padding: 1rem;
-                                        border-radius: 0.5rem;
-                                        margin: 0.5rem 0;
-                                    '>
-                                        <p style='font-size: 1.2rem; margin: 0;'>{text}</p>
-                                        <p style='color: #666; margin: 0;'>Confidence: {confidence:.2f}</p>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            
-                            # Download button
-                            st.download_button(
-                                "💾 Download Extracted Text",
-                                extracted_text,
-                                file_name="extracted_text.txt",
-                                mime="text/plain"
-                            )
-
+                # Convert base64 to image
+                img_data = base64.b64decode(st.session_state.captured_image.split(',')[1])
+                image = Image.open(BytesIO(img_data))
+                process_image(image)
             except Exception as e:
-                st.error(f"Error processing image: {str(e)}")
+                st.error(f"Error processing captured image: {str(e)}")
 
     with tab2:
-        st.markdown('<p class="big-text">Upload an existing image</p>', unsafe_allow_html=True)
-        
-        uploaded_file = st.file_uploader("", type=['png', 'jpg', 'jpeg'])
+        st.markdown("### Upload an Image")
+        uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'])
         
         if uploaded_file:
             try:
                 image = Image.open(uploaded_file)
-                
-                if st.button("📝 Extract Text from Image", key="process_upload"):
-                    with st.spinner("Processing your image..."):
-                        # Process image
-                        image_np = np.array(image)
-                        results = st.session_state.ocr_reader.readtext(image_np)
-                        
-                        # Show results
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown("### Original Image")
-                            st.image(image, use_container_width=True)
-                        
-                        with col2:
-                            st.markdown("### Detected Text Regions")
-                            annotated_image = draw_boxes(image, results)
-                            st.image(annotated_image, use_container_width=True)
-                        
-                        # Show extracted text
-                        st.markdown("### 📝 Extracted Text")
-                        if not results:
-                            st.warning("No text was detected. Please try with a different image.")
-                        else:
-                            extracted_text = ""
-                            for result in results:
-                                text, confidence = result[1], result[2]
-                                extracted_text += f"{text}\n"
-                                st.markdown(f"""
-                                    <div style='
-                                        background-color: #f0f2f6;
-                                        padding: 1rem;
-                                        border-radius: 0.5rem;
-                                        margin: 0.5rem 0;
-                                    '>
-                                        <p style='font-size: 1.2rem; margin: 0;'>{text}</p>
-                                        <p style='color: #666; margin: 0;'>Confidence: {confidence:.2f}</p>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            
-                            # Download button
-                            st.download_button(
-                                "💾 Download Extracted Text",
-                                extracted_text,
-                                file_name="extracted_text.txt",
-                                mime="text/plain"
-                            )
-
+                process_image(image)
             except Exception as e:
-                st.error(f"Error processing image: {str(e)}")
+                st.error(f"Error processing uploaded image: {str(e)}")
 
     # Helpful tips in expandable section
     with st.expander("📌 Tips for Better Results"):
