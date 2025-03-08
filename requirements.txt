@@ -1,8 +1,6 @@
-streamlit
-qrcode
-numpy
-opencv-python-headless
-pillow
-paddleocr
 paddlepaddle
-opencv-python
+paddleocr
+opencv-python-headless
+streamlit
+numpy
+pillow
