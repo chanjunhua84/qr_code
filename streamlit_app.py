@@ -14,44 +14,95 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS to make camera view larger
+# Custom CSS to maximize camera view and style buttons
 st.markdown("""
     <style>
-        /* Make the camera view larger */
+        /* Full screen camera styling */
         .stCamera {
-            width: 100%;
-            max-width: none;
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            z-index: 1000;
+            background: black;
         }
+        
         .stCamera > video {
-            width: 100%;
-            max-width: none;
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: cover !important;
         }
+        
         .stCamera > button {
-            width: 100%;
-            height: 3rem;
-            font-size: 1.2rem;
-            margin-top: 1rem;
+            position: fixed !important;
+            bottom: 20px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            z-index: 1001 !important;
+            width: 80px !important;
+            height: 80px !important;
+            border-radius: 50% !important;
+            background-color: white !important;
+            border: 3px solid #FF4B4B !important;
         }
-        /* Improve button visibility */
-        .stButton > button {
-            width: 100%;
-            height: 3rem;
-            font-size: 1.2rem;
-            margin-top: 1rem;
+        
+        /* Hide camera when not active */
+        .camera-hidden {
+            display: none !important;
+        }
+        
+        /* Custom button styling */
+        .custom-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
             background-color: #FF4B4B;
             color: white;
-        }
-        /* Make text larger and more readable */
-        .big-text {
-            font-size: 1.5rem;
-            font-weight: bold;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1.2rem;
+            cursor: pointer;
             margin: 1rem 0;
+            width: 100%;
+            height: 3rem;
+            text-decoration: none;
         }
-        /* Add some spacing between elements */
-        .spacing {
-            margin: 2rem 0;
+        
+        .custom-button:hover {
+            background-color: #FF3333;
+        }
+        
+        /* Result card styling */
+        .result-card {
+            background-color: #f0f2f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Hide Streamlit elements when camera is active */
+        .camera-active .main {
+            display: none !important;
         }
     </style>
+""", unsafe_allow_html=True)
+
+# JavaScript to handle camera visibility
+st.markdown("""
+    <script>
+        // Function to toggle camera visibility
+        function toggleCamera() {
+            const camera = document.querySelector('.stCamera');
+            if (camera) {
+                camera.classList.toggle('camera-hidden');
+            }
+        }
+    </script>
 """, unsafe_allow_html=True)
 
 @st.cache_resource(show_spinner=False)
@@ -110,12 +161,7 @@ def process_image(image):
                 text, confidence = result[1], result[2]
                 extracted_text += f"{text}\n"
                 st.markdown(f"""
-                    <div style='
-                        background-color: #f0f2f6;
-                        padding: 1rem;
-                        border-radius: 0.5rem;
-                        margin: 0.5rem 0;
-                    '>
+                    <div class="result-card">
                         <p style='font-size: 1.2rem; margin: 0;'>{text}</p>
                         <p style='color: #666; margin: 0;'>Confidence: {confidence:.2f}</p>
                     </div>
@@ -126,7 +172,8 @@ def process_image(image):
                 "💾 Download Extracted Text",
                 extracted_text,
                 file_name="extracted_text.txt",
-                mime="text/plain"
+                mime="text/plain",
+                use_container_width=True
             )
     except Exception as e:
         st.error(f"Error processing image: {str(e)}")
@@ -139,6 +186,10 @@ def main():
         with st.spinner("Loading OCR model..."):
             st.session_state.ocr_reader = load_ocr()
 
+    # Initialize session state for camera control
+    if 'show_camera' not in st.session_state:
+        st.session_state.show_camera = False
+
     # Create two tabs
     tab1, tab2 = st.tabs([
         "📸 Take Photo",
@@ -148,15 +199,22 @@ def main():
     with tab1:
         st.markdown("### Take a Photo of Text")
         
-        # Use Streamlit's built-in camera input
-        camera_image = st.camera_input("", key="camera")
+        # Custom button to launch camera
+        if st.button("📸 Launch Camera", use_container_width=True):
+            st.session_state.show_camera = True
+            st.experimental_rerun()
         
-        if camera_image is not None:
-            try:
-                image = Image.open(camera_image)
-                process_image(image)
-            except Exception as e:
-                st.error(f"Error processing camera image: {str(e)}")
+        # Show camera only when button is clicked
+        if st.session_state.show_camera:
+            camera_image = st.camera_input("", key="camera")
+            
+            if camera_image is not None:
+                try:
+                    image = Image.open(camera_image)
+                    st.session_state.show_camera = False  # Hide camera after capture
+                    process_image(image)
+                except Exception as e:
+                    st.error(f"Error processing camera image: {str(e)}")
 
     with tab2:
         st.markdown("### Upload an Image")
