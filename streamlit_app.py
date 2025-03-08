@@ -15,7 +15,19 @@ st.markdown("""
         text-align: center;
     }
     
-    .stButton > button {
+    /* Style the file uploader */
+    .stFileUploader > label {
+        font-size: 28px !important;
+        width: 90% !important;
+        margin: 20px auto !important;
+        padding: 20px !important;
+        border: 3px dashed #0088ff !important;
+        border-radius: 15px !important;
+        text-align: center !important;
+    }
+    
+    /* Style the download button */
+    .stDownloadButton > button {
         font-size: 28px !important;
         padding: 20px !important;
         width: 90% !important;
@@ -31,25 +43,16 @@ st.markdown("""
 # Title
 st.title("Text Scanner")
 
-# Initialize EasyOCR with CPU only
-@st.cache_resource
-def get_ocr_reader():
-    return easyocr.Reader(['en'], gpu=False)
-
-# Two columns for buttons
-col1, col2 = st.columns(2)
-
-with col1:
-    browse_btn = st.button("📄 BROWSE", use_container_width=True)
-with col2:
-    photo_btn = st.button("📸 PHOTO", use_container_width=True)
-
 # File uploader
 uploaded_file = st.file_uploader(
-    "",
+    "📸 TAP HERE TO TAKE PHOTO OR BROWSE",
     type=['jpg', 'jpeg', 'png', 'pdf'],
-    label_visibility="hidden"
 )
+
+# Initialize EasyOCR with GPU
+@st.cache_resource
+def get_ocr_reader():
+    return easyocr.Reader(['en'], gpu=True)  # Changed to GPU=True
 
 if uploaded_file:
     # Load and process image
@@ -83,14 +86,12 @@ if uploaded_file:
                 mime="text/plain",
                 use_container_width=True
             )
-        
-        if st.button("📸 SCAN ANOTHER"):
-            st.rerun()
 else:
     st.markdown("""
         <div class="big-text">
-        Choose an option:<br>
-        📄 BROWSE - Select a saved photo<br>
-        📸 PHOTO - Use your camera
+        Tap above to:<br>
+        📸 Take a new photo<br>
+        or<br>
+        📄 Choose a saved photo
         </div>
     """, unsafe_allow_html=True)
