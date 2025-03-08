@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS and JavaScript for native camera
+# Custom CSS
 st.markdown("""
     <style>
         .stButton > button {
@@ -36,15 +36,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# JavaScript for handling native camera
+# JavaScript for handling native camera with automatic form submission
 js_code = """
-<input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
-<button onclick="document.getElementById('camera-input').click();" 
-    style="width: 100%; height: 3rem; font-size: 1.2rem; margin: 1rem 0; 
-    background-color: #FF4B4B; color: white; border: none; border-radius: 0.3rem; 
-    cursor: pointer;">
-    📸 Open Camera
-</button>
+<form id="camera-form">
+    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+    <button type="button" onclick="document.getElementById('camera-input').click();" 
+        style="width: 100%; height: 3rem; font-size: 1.2rem; margin: 1rem 0; 
+        background-color: #FF4B4B; color: white; border: none; border-radius: 0.3rem; 
+        cursor: pointer;">
+        📸 Open Camera
+    </button>
+</form>
 <img id="captured-image" style="display: none;">
 
 <script>
@@ -52,13 +54,18 @@ js_code = """
         var file = e.target.files[0];
         var reader = new FileReader();
         reader.onload = function(e) {
+            // Display the image
             document.getElementById('captured-image').src = e.target.result;
             document.getElementById('captured-image').style.display = 'block';
+            
             // Send to Streamlit
             window.parent.postMessage({
                 type: 'streamlit:setComponentValue',
                 value: e.target.result
             }, '*');
+            
+            // Submit the form
+            document.getElementById('camera-form').submit();
         };
         reader.readAsDataURL(file);
     };
@@ -150,6 +157,10 @@ def main():
         with st.spinner("Loading OCR model..."):
             st.session_state.ocr_reader = load_ocr()
 
+    # Initialize session state for image processing
+    if 'process_image' not in st.session_state:
+        st.session_state.process_image = False
+
     # Create two tabs
     tab1, tab2 = st.tabs([
         "📸 Take Photo",
@@ -160,21 +171,27 @@ def main():
         st.markdown("### Take a Photo of Text")
         
         # Insert the custom camera component
-        st.components.v1.html(js_code, height=600)
+        camera_component = st.components.v1.html(js_code, height=600)
         
-        # Get the captured image from session state
-        if 'captured_image' in st.session_state:
+        # Handle file upload from camera
+        camera_file = st.file_uploader("", type=['jpg', 'jpeg', 'png'], key='camera')
+        if camera_file:
             try:
-                # Convert base64 to image
-                img_data = base64.b64decode(st.session_state.captured_image.split(',')[1])
-                image = Image.open(BytesIO(img_data))
-                process_image(image)
+                image = Image.open(camera_file)
+                st.session_state.process_image = True
+                st.session_state.current_image = image
+                st.experimental_rerun()
             except Exception as e:
-                st.error(f"Error processing captured image: {str(e)}")
+                st.error(f"Error processing camera image: {str(e)}")
+
+        # Process image if needed
+        if st.session_state.process_image and hasattr(st.session_state, 'current_image'):
+            process_image(st.session_state.current_image)
+            st.session_state.process_image = False
 
     with tab2:
         st.markdown("### Upload an Image")
-        uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'])
+        uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'], key='uploader')
         
         if uploaded_file:
             try:
