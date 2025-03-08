@@ -3,8 +3,6 @@ import easyocr
 from PIL import Image
 import numpy as np
 import cv2
-import base64
-from pathlib import Path
 
 def load_model():
     return easyocr.Reader(['en'])
@@ -17,14 +15,12 @@ def inject_custom_css():
     st.markdown("""
         <style>
         /* Full-width button styling */
-        .big-button {
+        .stButton > button {
             width: 100%;
             padding: 20px;
             font-size: 24px !important;
             margin: 10px 0;
             border-radius: 10px;
-            background-color: #0088ff;
-            color: white;
         }
         
         /* Large text styling */
@@ -33,30 +29,14 @@ def inject_custom_css():
             line-height: 1.5;
         }
         
-        /* Camera input container - hide when not needed */
-        .camera-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1000;
-            background: white;
+        /* Make the camera view larger */
+        .stCamera > video {
+            width: 100%;
+            max-width: 100%;
         }
         
-        /* Make the camera view full screen */
-        .stCamera {
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-        
-        /* Style the camera button to be more visible */
+        /* Style the camera button */
         .stCamera > button {
-            background-color: #0088ff !important;
-            color: white !important;
             padding: 20px !important;
             font-size: 20px !important;
             border-radius: 10px !important;
@@ -90,7 +70,7 @@ def main():
                     help="Click to open camera", 
                     use_container_width=True):
             st.session_state.show_camera = True
-            st.experimental_rerun()
+            st.rerun()  # Changed from experimental_rerun()
 
     # Show camera when button is clicked
     if st.session_state.show_camera:
@@ -137,7 +117,7 @@ def main():
                 if st.button("📸 SCAN AGAIN", 
                            use_container_width=True):
                     st.session_state.show_camera = True
-                    st.experimental_rerun()
+                    st.rerun()  # Changed from experimental_rerun()
 
     # Simple instructions with large text
     if not st.session_state.show_camera:
