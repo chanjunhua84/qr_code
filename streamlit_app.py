@@ -1,10 +1,8 @@
 import streamlit as st
 import easyocr
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy as np
-import cv2
 import os
-import torch
 
 # Force CPU usage to avoid CUDA/MPS issues
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -26,20 +24,28 @@ def load_ocr():
         return None
 
 def draw_boxes(image, bounds, color=(0, 255, 0), width=2):
-    """Draw bounding boxes on the image"""
+    """Draw bounding boxes on the image using PIL instead of cv2"""
     try:
-        img = np.array(image)
+        # Convert numpy array to PIL Image if necessary
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+        elif not isinstance(image, Image.Image):
+            raise ValueError("Unsupported image type")
+
+        # Create a copy of the image to draw on
+        draw_image = image.copy()
+        draw = ImageDraw.Draw(draw_image)
+
+        # Draw boxes
         for bound in bounds:
             p0, p1, p2, p3 = bound[0]
-            points = np.array([[int(p0[0]), int(p0[1])],
-                             [int(p1[0]), int(p1[1])],
-                             [int(p2[0]), int(p2[1])],
-                             [int(p3[0]), int(p3[1])]], np.int32)
-            cv2.polylines(img, [points], True, color, width)
-        return img
+            draw.line([tuple(p0), tuple(p1), tuple(p2), tuple(p3), tuple(p0)],
+                     fill=color, width=width)
+
+        return draw_image
     except Exception as e:
         st.error(f"Error drawing boxes: {str(e)}")
-        return np.array(image)
+        return image
 
 def main():
     st.title("🔤 OCR Text Extraction Tool")
@@ -61,7 +67,7 @@ def main():
             with col1:
                 st.subheader("Original Image")
                 image = Image.open(uploaded_file)
-                st.image(image, use_container_width=True)  # Updated parameter
+                st.image(image, use_container_width=True)
 
             if st.button("Extract Text"):
                 if st.session_state.ocr_reader is None:
@@ -70,18 +76,18 @@ def main():
 
                 with st.spinner("Processing image..."):
                     try:
-                        # Convert image to numpy array
+                        # Convert image to numpy array for EasyOCR
                         image_np = np.array(image)
                         
                         # Perform OCR
                         results = st.session_state.ocr_reader.readtext(image_np)
                         
-                        # Draw boxes on image
+                        # Draw boxes on image using PIL
                         annotated_image = draw_boxes(image, results)
                         
                         with col2:
                             st.subheader("Detected Text Regions")
-                            st.image(annotated_image, use_container_width=True)  # Updated parameter
+                            st.image(annotated_image, use_container_width=True)
 
                         # Display results
                         st.subheader("Extracted Text")
