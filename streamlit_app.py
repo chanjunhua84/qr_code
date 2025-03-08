@@ -7,46 +7,72 @@ import os
 # Force CPU usage
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Set page configuration
+# Set page configuration for full screen
 st.set_page_config(
     page_title="Camera OCR App",
     page_icon="📸",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS to maximize camera view and style buttons
+# Custom CSS for full screen mobile camera
 st.markdown("""
     <style>
+        /* Hide Streamlit elements when camera is active */
+        [data-testid="stToolbar"] {
+            display: none;
+        }
+        
+        .stApp {
+            margin: 0;
+            padding: 0;
+            max-width: 100vw !important;
+        }
+        
         /* Full screen camera styling */
         .stCamera {
             position: fixed !important;
-            top: 0;
-            left: 0;
+            min-width: 100vw !important;
+            min-height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
             width: 100vw !important;
             height: 100vh !important;
-            max-width: none !important;
-            max-height: none !important;
-            z-index: 1000;
+            left: 0;
+            top: 0;
+            z-index: 9999;
             background: black;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
         }
         
         .stCamera > video {
             width: 100vw !important;
             height: 100vh !important;
             object-fit: cover !important;
+            position: fixed !important;
+            left: 0;
+            top: 0;
         }
         
         .stCamera > button {
             position: fixed !important;
-            bottom: 20px !important;
+            bottom: 40px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
-            z-index: 1001 !important;
+            z-index: 10000 !important;
             width: 80px !important;
             height: 80px !important;
             border-radius: 50% !important;
             background-color: white !important;
-            border: 3px solid #FF4B4B !important;
+            border: 4px solid #FF4B4B !important;
+            padding: 0 !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+        }
+        
+        .stCamera > button:hover {
+            background-color: #f8f8f8 !important;
         }
         
         /* Hide camera when not active */
@@ -55,25 +81,15 @@ st.markdown("""
         }
         
         /* Custom button styling */
-        .custom-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.5rem 1rem;
+        .stButton > button {
+            width: 100%;
+            height: 3.5rem;
+            font-size: 1.2rem;
             background-color: #FF4B4B;
             color: white;
             border: none;
-            border-radius: 0.5rem;
-            font-size: 1.2rem;
-            cursor: pointer;
+            border-radius: 8px;
             margin: 1rem 0;
-            width: 100%;
-            height: 3rem;
-            text-decoration: none;
-        }
-        
-        .custom-button:hover {
-            background-color: #FF3333;
         }
         
         /* Result card styling */
@@ -85,24 +101,51 @@ st.markdown("""
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        /* Hide Streamlit elements when camera is active */
-        .camera-active .main {
+        /* Mobile-friendly container */
+        .mobile-container {
+            padding: 1rem;
+            max-width: 100vw;
+        }
+        
+        /* Tab styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2rem;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            height: 4rem;
+        }
+        
+        /* Hide header when camera is active */
+        .camera-active header {
             display: none !important;
         }
-    </style>
-""", unsafe_allow_html=True)
-
-# JavaScript to handle camera visibility
-st.markdown("""
-    <script>
-        // Function to toggle camera visibility
-        function toggleCamera() {
-            const camera = document.querySelector('.stCamera');
-            if (camera) {
-                camera.classList.toggle('camera-hidden');
+        
+        /* Adjust main content padding */
+        .main .block-container {
+            padding: 1rem !important;
+            max-width: 100vw !important;
+        }
+        
+        /* Make images full width on mobile */
+        .stImage > img {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* Responsive text sizing */
+        @media screen and (max-width: 640px) {
+            .stMarkdown h1 {
+                font-size: 1.5rem !important;
+            }
+            .stMarkdown h2 {
+                font-size: 1.3rem !important;
+            }
+            .stMarkdown h3 {
+                font-size: 1.1rem !important;
             }
         }
-    </script>
+    </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource(show_spinner=False)
@@ -140,16 +183,12 @@ def process_image(image):
         results = st.session_state.ocr_reader.readtext(image_np)
         
         # Show results in a clean layout
-        col1, col2 = st.columns(2)
+        st.markdown("### Original Photo")
+        st.image(image, use_container_width=True)
         
-        with col1:
-            st.markdown("### Original Photo")
-            st.image(image, use_container_width=True)
-        
-        with col2:
-            st.markdown("### Detected Text Regions")
-            annotated_image = draw_boxes(image, results)
-            st.image(annotated_image, use_container_width=True)
+        st.markdown("### Detected Text Regions")
+        annotated_image = draw_boxes(image, results)
+        st.image(annotated_image, use_container_width=True)
         
         # Show extracted text in a clean format
         st.markdown("### 📝 Extracted Text")
@@ -197,27 +236,24 @@ def main():
     ])
 
     with tab1:
-        st.markdown("### Take a Photo of Text")
+        if not st.session_state.show_camera:
+            st.button("📸 Launch Camera", key="launch_camera", 
+                     on_click=lambda: setattr(st.session_state, 'show_camera', True))
         
-        # Custom button to launch camera
-        if st.button("📸 Launch Camera", use_container_width=True):
-            st.session_state.show_camera = True
-            st.experimental_rerun()
-        
-        # Show camera only when button is clicked
         if st.session_state.show_camera:
-            camera_image = st.camera_input("", key="camera")
-            
-            if camera_image is not None:
-                try:
-                    image = Image.open(camera_image)
-                    st.session_state.show_camera = False  # Hide camera after capture
-                    process_image(image)
-                except Exception as e:
-                    st.error(f"Error processing camera image: {str(e)}")
+            camera_col = st.container()
+            with camera_col:
+                camera_image = st.camera_input("", key="camera")
+                
+                if camera_image is not None:
+                    try:
+                        image = Image.open(camera_image)
+                        st.session_state.show_camera = False
+                        process_image(image)
+                    except Exception as e:
+                        st.error(f"Error processing camera image: {str(e)}")
 
     with tab2:
-        st.markdown("### Upload an Image")
         uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'])
         
         if uploaded_file:
@@ -227,10 +263,9 @@ def main():
             except Exception as e:
                 st.error(f"Error processing uploaded image: {str(e)}")
 
-    # Helpful tips in expandable section
+    # Tips in expandable section
     with st.expander("📌 Tips for Better Results"):
         st.markdown("""
-            ### For Best Results:
             - Ensure good lighting
             - Hold the camera steady
             - Keep text horizontal
