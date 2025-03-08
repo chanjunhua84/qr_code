@@ -1,7 +1,4 @@
-paddlepaddle
-paddleocr
+easyocr
 opencv-python-headless
 streamlit
-numpy
 pillow
-easyocr
