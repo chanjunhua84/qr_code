@@ -2,7 +2,6 @@ import streamlit as st
 import easyocr
 from PIL import Image
 import numpy as np
-import cv2
 
 def load_model():
     return easyocr.Reader(['en'])
@@ -14,33 +13,17 @@ def perform_ocr(image, reader):
 def inject_custom_css():
     st.markdown("""
         <style>
-        /* Hide Streamlit elements */
+        /* Hide default elements */
         #MainMenu {visibility: hidden;}
         header {visibility: hidden;}
         footer {visibility: hidden;}
-        
-        /* Full screen button styling */
-        .camera-button {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80vw;
-            height: 15vh;
-            font-size: 24px !important;
-            background-color: #0088ff;
-            color: white;
-            border: none;
-            border-radius: 15px;
-            cursor: pointer;
-            z-index: 1000;
-        }
         
         /* Large text styling */
         .large-text {
             font-size: 24px;
             line-height: 1.6;
             margin: 20px 0;
+            text-align: center;
         }
         
         /* Results container */
@@ -50,33 +33,22 @@ def inject_custom_css():
             font-size: 24px;
         }
         
-        /* Custom file uploader */
+        /* Hide default file uploader */
         .stFileUploader {
             display: none;
         }
+        
+        /* Custom button styling */
+        .stButton > button {
+            width: 80%;
+            height: 100px;
+            margin: 10% 10%;
+            font-size: 24px !important;
+            background-color: #0088ff;
+            color: white;
+            border-radius: 15px;
+        }
         </style>
-    """, unsafe_allow_html=True)
-
-def create_camera_button():
-    return st.markdown("""
-        <input type="file" 
-               id="camera" 
-               accept="image/*" 
-               capture="environment" 
-               style="display: none;">
-        <button class="camera-button" onclick="document.getElementById('camera').click()">
-            📸 TAKE PHOTO
-        </button>
-        <script>
-            document.getElementById('camera').onchange = function(e) {
-                var form = new FormData();
-                form.append('file', e.target.files[0]);
-                fetch('/', {
-                    method: 'POST',
-                    body: form
-                });
-            }
-        </script>
     """, unsafe_allow_html=True)
 
 def main():
@@ -95,44 +67,54 @@ def main():
     
     reader = get_ocr_reader()
 
-    # Session state
-    if 'processed_image' not in st.session_state:
-        st.session_state.processed_image = None
-
-    # Main interface
     st.markdown('<h1 style="text-align: center; font-size: 36px;">Text Scanner</h1>', 
                 unsafe_allow_html=True)
 
-    # File uploader that triggers native camera
+    # Create two columns for centering
+    col1, col2, col3 = st.columns([1,2,1])
+
+    with col2:
+        # Custom file input that forces back camera
+        st.markdown("""
+            <div class="large-text">
+                <input type="file" 
+                    id="camera" 
+                    accept="image/*" 
+                    capture="environment"
+                    style="display: none;"
+                    onchange="handleFileSelect(event)">
+            </div>
+            """, unsafe_allow_html=True)
+
+        # JavaScript to handle file selection
+        st.markdown("""
+            <script>
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Submit the form
+                document.getElementsByTagName('form')[0].submit();
+            }
+            </script>
+            """, unsafe_allow_html=True)
+
+        # Button that triggers the hidden file input
+        if st.button("📸 TAKE PHOTO", key="camera_button"):
+            st.markdown("""
+                <script>
+                document.getElementById('camera').click();
+                </script>
+                """, unsafe_allow_html=True)
+
+    # File uploader (hidden but functional)
     uploaded_file = st.file_uploader(
         "",
         type=['jpg', 'jpeg', 'png'],
         key="uploader",
-        accept_multiple_files=False,
-        help="",
-        on_change=None,
-        args=None,
-        kwargs=None,
+        label_visibility="hidden"
     )
-
-    # Custom camera button
-    if not uploaded_file:
-        st.markdown(
-            '<div class="large-text" style="text-align: center;">Tap button to take photo:</div>',
-            unsafe_allow_html=True
-        )
-        create_camera_button()
-        
-        # Instructions
-        st.markdown("""
-            <div class="large-text" style="text-align: center; margin-top: 40vh;">
-            How to use:<br>
-            1. Tap the TAKE PHOTO button<br>
-            2. Allow camera access<br>
-            3. Take picture of text<br>
-            4. Wait for results
-            </div>
-        """, unsafe_allow_html=True)
 
     # Process image if uploaded
     if uploaded_file:
@@ -141,16 +123,16 @@ def main():
         with st.spinner('Reading text...'):
             results = perform_ocr(image, reader)
             
-            # Display results
             st.markdown('<div class="results-container">', unsafe_allow_html=True)
             
             all_text = []
             for result in results:
                 text = result[1]
                 confidence = result[2]
-                all_text.append(text)
-                st.markdown(f'<div class="large-text">{text}</div>', 
-                          unsafe_allow_html=True)
+                if confidence > 0.2:  # Filter low confidence results
+                    all_text.append(text)
+                    st.markdown(f'<div class="large-text">{text}</div>', 
+                              unsafe_allow_html=True)
             
             if all_text:
                 combined_text = "\n".join(all_text)
@@ -168,8 +150,18 @@ def main():
         
         # Scan again button
         if st.button("📸 SCAN ANOTHER", use_container_width=True):
-            st.session_state.processed_image = None
             st.rerun()
+    else:
+        # Instructions
+        st.markdown("""
+            <div class="large-text" style="margin-top: 40px;">
+            How to use:<br>
+            1. Tap TAKE PHOTO button<br>
+            2. Allow camera access<br>
+            3. Take picture of text<br>
+            4. Wait for results
+            </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
