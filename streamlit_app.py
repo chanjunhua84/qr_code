@@ -13,33 +13,41 @@ def perform_ocr(image, reader):
 def inject_custom_css():
     st.markdown("""
         <style>
-        /* Make text and buttons larger */
+        /* Large, clear text */
         .big-text {
-            font-size: 24px !important;
-            margin: 15px 0;
+            font-size: 28px !important;
+            line-height: 1.5;
+            margin: 20px 0;
+            text-align: center;
         }
         
+        /* Make buttons very prominent */
         .stButton > button {
-            font-size: 24px !important;
-            padding: 15px !important;
-            width: 100%;
-        }
-        
-        /* Make camera button more prominent */
-        .stCamera > button {
-            font-size: 24px !important;
-            padding: 15px !important;
+            font-size: 28px !important;
+            padding: 20px !important;
+            width: 90% !important;
+            margin: 20px auto !important;
+            display: block !important;
+            border-radius: 15px !important;
             background-color: #0088ff !important;
             color: white !important;
-            width: 100% !important;
         }
         
-        /* Center camera preview */
-        .stCamera > video {
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto;
-            display: block;
+        /* Hide the default file uploader */
+        .stFileUploader > label {
+            font-size: 28px !important;
+            width: 90% !important;
+            margin: 20px auto !important;
+            padding: 20px !important;
+            border: 3px dashed #0088ff !important;
+            border-radius: 15px !important;
+            text-align: center !important;
+        }
+        
+        /* Center all content */
+        .block-container {
+            max-width: 100%;
+            padding: 20px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -60,25 +68,30 @@ def main():
     
     reader = get_ocr_reader()
 
-    st.title("Text Scanner")
-
-    # Simple instructions
-    st.markdown('<div class="big-text">Point camera at text and take a photo</div>', 
+    st.markdown('<h1 style="text-align: center; font-size: 36px;">Text Scanner</h1>', 
                 unsafe_allow_html=True)
 
-    # Camera input
-    picture = st.camera_input(
-        label="",
-        key="camera",
-        help="Click to take photo",
-        disabled=False,
-        label_visibility="collapsed"
+    # Clear instructions
+    if 'processed_image' not in st.session_state:
+        st.markdown("""
+            <div class="big-text">
+            1. Tap the button below<br>
+            2. Take photo using your camera<br>
+            3. Wait for the text to appear
+            </div>
+        """, unsafe_allow_html=True)
+
+    # File uploader styled as a big button
+    uploaded_file = st.file_uploader(
+        "📸 TAP HERE TO TAKE PHOTO",
+        type=['jpg', 'jpeg', 'png'],
+        accept_multiple_files=False,
     )
 
-    if picture:
-        image = Image.open(picture)
+    if uploaded_file:
+        image = Image.open(uploaded_file)
         
-        with st.spinner('Reading text...'):
+        with st.spinner('Reading the text from your photo...'):
             results = perform_ocr(image, reader)
             
             st.markdown('<div class="big-text">Found Text:</div>', 
@@ -96,6 +109,9 @@ def main():
             if all_text:
                 combined_text = "\n".join(all_text)
                 
+                st.markdown('<div class="big-text">Save the text:</div>', 
+                           unsafe_allow_html=True)
+                
                 st.download_button(
                     label="💾 SAVE TEXT",
                     data=combined_text,
@@ -103,6 +119,9 @@ def main():
                     mime="text/plain",
                     use_container_width=True
                 )
+            
+            st.markdown('<div class="big-text">Want to scan another?</div>', 
+                       unsafe_allow_html=True)
             
             if st.button("📸 SCAN ANOTHER", use_container_width=True):
                 st.rerun()
