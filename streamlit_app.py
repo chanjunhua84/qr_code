@@ -108,45 +108,47 @@ letters = {
 
 def get_letter_content(letter_id):
     """
-    Get the content of a letter based on its ID
+    Get and display letter content based on letter ID
     
     Args:
         letter_id (str): The ID of the letter
         
     Returns:
-        tuple: (title, content) if letter exists, (None, None) if it doesn't
+        str: Combined title and content if letter exists, error message if it doesn't
     """
-    if letter_id and letter_id in letters:
-        letter = letters[letter_id]
-        return letter["title"], letter["content"]
-    return None, None
-
-def main():
     st.title("Letter Reader")
     
-    # Get query parameters
-    query_params = st.experimental_get_query_params()
-    
-    # Get letter ID from parameters
-    letter_id = None
-    if 'letter' in query_params:
-        letter_id = query_params['letter'][0]
+    # Get query parameters if letter_id is not provided
+    if not letter_id:
+        query_params = st.experimental_get_query_params()
+        letter_id = query_params.get('letter', [None])[0]
 
-    # Store content in variables
-    title, content = get_letter_content(letter_id)
-    
-    # Display letter based on stored content
-    if title and content:
-        st.header(title)
-        st.markdown(content)
+    # Check if letter exists and return content
+    if letter_id and letter_id in letters:
+        letter = letters[letter_id]
+        title = letter["title"]
+        content = letter["content"]
         
         # Store in session state for later use
         st.session_state['current_title'] = title
         st.session_state['current_content'] = content
         
+        # Display content
+        st.header(title)
+        st.markdown(content)
+        
+        # Return combined text
+        return f"{title}\n\n{content}"
     else:
+        error_message = "Letter not found. Available letters: " + ", ".join(letters.keys())
         st.info("Please scan a valid letter QR code")
         st.write("Available letters:", list(letters.keys()))
+        return error_message
+
+# Example usage:
+# text = get_letter_content("letter1")  # Will return and display the CPF letter
+# text = get_letter_content("letter2")  # Will return and display the Budget letter
+# text = get_letter_content("invalid_letter")  # Will return and display error message)))
 
 if __name__ == "__main__":
-    main()
+    get_letter_content()
