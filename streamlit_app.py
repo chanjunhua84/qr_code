@@ -19,7 +19,7 @@ def main():
     st.title("Reading App")
 
     # Get query parameters
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()
     
     # Handle story ID from URL
     story_id = query_params.get('story', [None])[0]
