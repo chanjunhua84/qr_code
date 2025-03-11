@@ -34,6 +34,7 @@ def main():
     
     # Get query parameters
     query_params = st.experimental_get_query_params()
+    summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=0 if torch.cuda.is_available() else -1)
     
     # Debug: Show current parameters
     st.write("Debug - URL Parameters:", query_params)
@@ -50,8 +51,9 @@ def main():
     if story_id and story_id in stories:
         story = stories[story_id]
         st.header(story["title"])
-        st.info(f"Reading Level: {story['level']}")
+        #st.info(f"Reading Level: {story['level']}")
         st.markdown(story["content"])
+        st.markdown(summary_text = summarizer(story["content"], max_length=150, min_length=50, do_sample=False)[0]["summary_text"])
     else:
         st.info("Please scan a valid story QR code")
         st.write("Available stories:", list(stories.keys()))
