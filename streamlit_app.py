@@ -131,8 +131,7 @@ def get_letter_content(letter_id):
         
         # Store in session state for later use
         st.session_state['current_title'] = title
-        st.session_state['current_content'] = content st.session_letterTitle['current_title'] = title
-        st.session_state.extracted_text['current_content'] = content
+        st.session_state['current_content'] = content
         
         # Display content
         st.header(title)
@@ -146,10 +145,5 @@ def get_letter_content(letter_id):
         st.write("Available letters:", list(letters.keys()))
         return error_message
 
-# Example usage:
-# text = get_letter_content("letter1")  # Will return and display the CPF letter
-# text = get_letter_content("letter2")  # Will return and display the Budget letter
-# text = get_letter_content("invalid_letter")  # Will return and display error message)))
-
 if __name__ == "__main__":
-    get_letter_content()
+    get_letter_content(None)
