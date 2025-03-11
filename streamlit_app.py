@@ -131,7 +131,7 @@ def get_letter_content(letter_id):
         
         # Store in session state for later use
         st.session_letterTitle['current_title'] = title
-        st.session_extracted_text['current_content'] = content
+        st.session_state.extracted_text['current_content'] = content
         
         # Display content
         st.header(title)
