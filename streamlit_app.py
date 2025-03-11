@@ -106,7 +106,7 @@ letters = {
     }
 }
 
-def get_letter_content(letter_id):
+def get_letter_content():
     """
     Get and display letter content based on letter ID
     
