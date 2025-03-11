@@ -34,28 +34,26 @@ stories = {
 def main():
     st.title("Story Reader")
     
-    # Initialize summarizer
+    # Initialize summarizer with caching
     @st.cache_resource
     def load_summarizer():
         return pipeline("summarization", 
                        model="facebook/bart-large-cnn", 
                        device=0 if torch.cuda.is_available() else -1)
     
-    summarizer = load_summarizer()
+    try:
+        summarizer = load_summarizer()
+    except Exception as e:
+        st.error(f"Error loading summarizer: {e}")
+        summarizer = None
     
     # Get query parameters
     query_params = st.experimental_get_query_params()
-    
-    # Debug: Show current parameters
-    st.write("Debug - URL Parameters:", query_params)
     
     # Get story ID from parameters
     story_id = None
     if 'story' in query_params:
         story_id = query_params['story'][0]
-    
-    # Debug: Show detected story ID
-    st.write("Debug - Detected Story ID:", story_id)
 
     # Display story based on ID
     if story_id and story_id in stories:
@@ -64,13 +62,17 @@ def main():
         st.markdown(story["content"])
         
         # Generate and display summary
-        with st.spinner('Generating summary...'):
-            summary = summarizer(story["content"], 
-                               max_length=150, 
-                               min_length=50, 
-                               do_sample=False)[0]["summary_text"]
-            st.subheader("Summary")
-            st.markdown(summary)
+        if summarizer:
+            try:
+                with st.spinner('Generating summary...'):
+                    summary = summarizer(story["content"], 
+                                       max_length=150, 
+                                       min_length=50, 
+                                       do_sample=False)[0]["summary_text"]
+                    st.subheader("Summary")
+                    st.markdown(summary)
+            except Exception as e:
+                st.error(f"Error generating summary: {e}")
     else:
         st.info("Please scan a valid story QR code")
         st.write("Available stories:", list(stories.keys()))
