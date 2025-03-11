@@ -1,8 +1,4 @@
 import streamlit as st
-import cv2
-import numpy as np
-import time
-from urllib.parse import urlparse, parse_qs
 
 # Dictionary of stories with clear structure
 stories = {
@@ -35,19 +31,30 @@ stories = {
 
 def main():
     st.title("Story Reader")
-
-    # Get story ID directly from URL parameters
+    
+    # Get query parameters
     query_params = st.experimental_get_query_params()
-    story_id = query_params.get('story', [None])[0]
+    
+    # Debug: Show current parameters
+    st.write("Debug - URL Parameters:", query_params)
+    
+    # Get story ID from parameters
+    story_id = None
+    if 'story' in query_params:
+        story_id = query_params['story'][0]
+    
+    # Debug: Show detected story ID
+    st.write("Debug - Detected Story ID:", story_id)
 
-    # If story ID is in URL, display that story
+    # Display story based on ID
     if story_id and story_id in stories:
         story = stories[story_id]
         st.header(story["title"])
         st.info(f"Reading Level: {story['level']}")
         st.markdown(story["content"])
     else:
-        st.info("Scan a QR code to read a story")
+        st.info("Please scan a valid story QR code")
+        st.write("Available stories:", list(stories.keys()))
 
 if __name__ == "__main__":
     main()
