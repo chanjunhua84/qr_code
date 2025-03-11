@@ -1,97 +1,67 @@
 import streamlit as st
-from PIL import Image
-import easyocr
-import numpy as np
+from urllib.parse import parse_qs
 
-st.set_page_config(page_title="Text Scanner", layout="wide")
-
-# Custom CSS
-st.markdown("""
-    <style>
-    .big-text {
-        font-size: 28px !important;
-        line-height: 1.5;
-        margin: 20px 0;
-        text-align: center;
+# Dictionary of content based on parameters
+content_mapping = {
+    "story1": {
+        "title": "The Little Red Hen",
+        "text": "Once upon a time...",
+        "level": "beginner"
+    },
+    "story2": {
+        "title": "Three Little Pigs",
+        "text": "Once there were three pigs...",
+        "level": "intermediate"
     }
+}
+
+def main():
+    st.title("Reading App")
+
+    # Get query parameters
+    query_params = st.experimental_get_query_params()
     
-    /* Style the file uploader */
-    .stFileUploader > label {
-        font-size: 28px !important;
-        width: 90% !important;
-        margin: 20px auto !important;
-        padding: 20px !important;
-        border: 3px dashed #0088ff !important;
-        border-radius: 15px !important;
-        text-align: center !important;
-    }
+    # Handle story ID from URL
+    story_id = query_params.get('story', [None])[0]
+    reading_level = query_params.get('level', [None])[0]
+
+    # Sidebar for navigation
+    st.sidebar.title("Navigation")
     
-    /* Style the download button */
-    .stDownloadButton > button {
-        font-size: 28px !important;
-        padding: 20px !important;
-        width: 90% !important;
-        margin: 20px auto !important;
-        display: block !important;
-        border-radius: 15px !important;
-        background-color: #0088ff !important;
-        color: white !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Title
-st.title("Text Scanner")
-
-# File uploader
-uploaded_file = st.file_uploader(
-    "📸 TAP HERE TO TAKE PHOTO OR BROWSE",
-    type=['jpg', 'jpeg', 'png', 'pdf'],
-)
-
-# Initialize EasyOCR with GPU
-@st.cache_resource
-def get_ocr_reader():
-    return easyocr.Reader(['en'], gpu=True)  # Changed to GPU=True
-
-if uploaded_file:
-    # Load and process image
-    image = Image.open(uploaded_file)
-    
-    with st.spinner('Reading text... Please wait...'):
-        # Get OCR reader
-        reader = get_ocr_reader()
+    # Display content based on URL parameters
+    if story_id and story_id in content_mapping:
+        story = content_mapping[story_id]
         
-        # Perform OCR
-        results = reader.readtext(np.array(image))
+        # Display story content
+        st.header(story["title"])
         
-        # Display results
-        st.markdown('<div class="big-text">Found Text:</div>', 
-                   unsafe_allow_html=True)
+        # Show reading level if specified in URL
+        if reading_level:
+            st.info(f"Reading Level: {reading_level}")
         
-        all_text = []
-        for result in results:
-            text = result[1]
-            confidence = result[2]
-            if confidence > 0.2:
-                all_text.append(text)
-                st.write(text)
+        # Display story text
+        st.write(story["text"])
         
-        if all_text:
-            combined_text = "\n".join(all_text)
-            st.download_button(
-                "💾 SAVE TEXT",
-                data=combined_text,
-                file_name="text.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-else:
-    st.markdown("""
-        <div class="big-text">
-        Tap above to:<br>
-        📸 Take a new photo<br>
-        or<br>
-        📄 Choose a saved photo
-        </div>
-    """, unsafe_allow_html=True)
+        # Additional features
+        st.markdown("---")
+        if st.button("Mark as Complete"):
+            st.success("Progress saved!")
+            
+    else:
+        st.warning("Please select a story or provide a valid story ID in the URL")
+        
+        # Show available stories
+        st.subheader("Available Stories")
+        for id, story in content_mapping.items():
+            if st.button(story["title"]):
+                # Update URL with selected story
+                new_params = {"story": id}
+                st.experimental_set_query_params(**new_params)
+                st.rerun()
+
+    # Show current URL parameters (for debugging)
+    st.sidebar.subheader("Current URL Parameters")
+    st.sidebar.write(query_params)
+
+if __name__ == "__main__":
+    main()
